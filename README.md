@@ -6,6 +6,7 @@ Aside from PyTorch, Scikit Learn and Scipy the implementation comes from hugging
 
 ```
 pip install transformers
+pip install simpletransformers==0.3.2  
 ```
 
 ## Usage
