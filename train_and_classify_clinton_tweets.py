@@ -9,8 +9,9 @@ torch.manual_seed(1)
 torch.cuda.manual_seed(1)
 
 from smaberta import TransformerModel
-
-train_df = pd.read_csv("~/smapp_stance_classifier/data/clinton_2016_smapp/train.csv")
+print("Import Success")
+#exit(0)
+train_df = pd.read_csv("./data/train.csv")
 
 mapping = {"Positive":2, "Negative":0, "Neutral":1}
 
@@ -23,7 +24,7 @@ train_data = [[texts[i], labels[i]] for i in range(len(texts))]
 
 train_data = pd.DataFrame(train_data)
 
-test_df = pd.read_csv("~/smapp_stance_classifier/data/clinton_2016_smapp/test.csv")
+test_df = pd.read_csv("./data/test.csv")
 
 test_temp = test_df.applymap(lambda s: mapping.get(s) if s in mapping else s)
 

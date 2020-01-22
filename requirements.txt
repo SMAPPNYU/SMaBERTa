@@ -1,0 +1,6 @@
+transformers==2.1.0
+simpletransformers==0.3.2
+pandas
+torch
+torchvision
+tensorboardX
