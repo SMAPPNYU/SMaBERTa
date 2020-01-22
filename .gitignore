@@ -1,4 +1,5 @@
 runs/*
+data/*
 outputs/*
 __pycache__/*
 cache_dir/*

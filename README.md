@@ -4,9 +4,12 @@ Code for this project was adapted from version 0.6 of https://github.com/Thilina
 ## Setup
 Aside from PyTorch, Scikit Learn and Scipy the implementation comes from huggingface/transformers
 
+A dockerfile is provided to execute the scripts with the caveat of using PyTorch in CPU mode which is pretty slow. 
+
+Additionally you could install the dependencies at the right version using the Requirements file. 
+
 ```
-pip install transformers
-pip install simpletransformers==0.3.2  
+pip install -r requirements.txt
 ```
 
 ## Usage
