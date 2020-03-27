@@ -29,9 +29,9 @@ from transformers import (WEIGHTS_NAME, BertConfig,
                                   DistilBertForSequenceClassification,
                                   DistilBertTokenizer)
 
-from transformers import AdamW, WarmupLinearSchedule
+from transformers import AdamW, get_linear_schedule_with_warmup
 
-from simpletransformers.utils import (convert_examples_to_features, InputExample)
+from simpletransformers.classification.classification_utils import (convert_examples_to_features, InputExample)
 
 import math
 from tensorboardX import SummaryWriter
@@ -309,7 +309,7 @@ class TransformerModel:
         args['warmup_steps'] = warmup_steps if args['warmup_steps'] == 0 else args['warmup_steps']
 
         optimizer = AdamW(optimizer_grouped_parameters, lr=args['learning_rate'], eps=args['adam_epsilon'])
-        scheduler = WarmupLinearSchedule(optimizer, warmup_steps=args['warmup_steps'], t_total=t_total)
+        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args['warmup_steps'], num_training_steps=t_total)
 
         if args['fp16']:
             try:
