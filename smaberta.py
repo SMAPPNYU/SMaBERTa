@@ -40,7 +40,7 @@ from multiprocessing import cpu_count
 
 
 class TransformerModel:
-    def __init__(self, model_type, model_name, num_labels=2, args=None, use_cuda=True):
+    def __init__(self, model_type, model_name, num_labels=2, args=None, use_cuda=True, location=""):
         """
         Initializes a Transformer model.
         Args:
@@ -60,8 +60,14 @@ class TransformerModel:
                 }
 
         config_class, model_class, tokenizer_class = MODEL_CLASSES[model_type]
-        self.tokenizer = tokenizer_class.from_pretrained(model_name)
-        self.model = model_class.from_pretrained(model_name, num_labels=num_labels)
+        if location="":
+            self.tokenizer = tokenizer_class.from_pretrained(model_name)
+            self.model = model_class.from_pretrained(model_name, num_labels=num_labels)
+        else:
+            self.tokenizer = tokenizer_class.from_pretrained(location)
+            self.model = model_class.from_pretrained(location, num_labels=num_labels)
+       
+     
         
         if use_cuda:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
