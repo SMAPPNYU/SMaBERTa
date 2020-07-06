@@ -60,7 +60,7 @@ class TransformerModel:
                 }
 
         config_class, model_class, tokenizer_class = MODEL_CLASSES[model_type]
-        if location="":
+        if location=="":
             self.tokenizer = tokenizer_class.from_pretrained(model_name)
             self.model = model_class.from_pretrained(model_name, num_labels=num_labels)
         else:
@@ -85,7 +85,7 @@ class TransformerModel:
             'max_seq_length': 128,
             'train_batch_size': 25,
             'gradient_accumulation_steps': 1,
-            'eval_batch_size': 25,
+            'eval_batch_size': 50,
             'num_train_epochs': 1,
             'weight_decay': 0,
             'learning_rate': 4e-5,
