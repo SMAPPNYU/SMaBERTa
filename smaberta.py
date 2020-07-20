@@ -108,7 +108,7 @@ class TransformerModel:
         self.args['model_name'] = model_name
         self.args['model_type'] = model_type
 
-    def train_model(self, train_df, output_dir=None, show_running_loss=True, args=None):
+    def train_model(self, train_df, output_dir=None, show_running_loss=False, args=None):
         """
         Trains the model using 'train_df'
         Args:
@@ -188,7 +188,6 @@ class TransformerModel:
         results = {}
 
         eval_examples = [InputExample(i, text, None, label) for i, (text, label) in enumerate(zip(eval_df.iloc[:, 0], eval_df.iloc[:, 1]))]
-
         eval_dataset = self.load_and_cache_examples(eval_examples, evaluate=True)
         if not os.path.exists(eval_output_dir):
             os.makedirs(eval_output_dir)
@@ -200,7 +199,8 @@ class TransformerModel:
         nb_eval_steps = 0
         preds = None
         out_label_ids = None
-        for batch in tqdm(eval_dataloader):
+        #for batch in tqdm(eval_dataloader):
+        for batch in eval_dataloader:
             model.eval()
             batch = tuple(t.to(device) for t in batch)
 
@@ -271,7 +271,7 @@ class TransformerModel:
                                                     pad_on_left=bool(args['model_type'] in ['xlnet']),
                                                     pad_token=tokenizer.convert_tokens_to_ids([tokenizer.pad_token])[0],
                                                     pad_token_segment_id=4 if args['model_type'] in ['xlnet'] else 0,
-                                                    process_count=process_count)
+                                                    process_count=process_count, silent=True)
 
             if not no_cache:
                 torch.save(features, cached_features_file)
@@ -328,11 +328,13 @@ class TransformerModel:
         global_step = 0
         tr_loss, logging_loss = 0.0, 0.0
         model.zero_grad()
-        train_iterator = trange(int(args['num_train_epochs']), desc="Epoch")
-        
+        train_iterator = range(int(args['num_train_epochs']))#, desc="Epoch")
+        ctr = 0
         for _ in train_iterator:
+            print("Starting Epoch: ", ctr)
+            ctr+=1
             # epoch_iterator = tqdm(train_dataloader, desc="Iteration")
-            for step, batch in enumerate(tqdm(train_dataloader, desc="Current iteration")):
+            for step, batch in enumerate(train_dataloader):#, desc="Current iteration"):
                 model.train()
                 batch = tuple(t.to(device) for t in batch)
                 inputs = {'input_ids':      batch[0],
@@ -451,7 +453,8 @@ class TransformerModel:
         nb_eval_steps = 0
         preds = None
         out_label_ids = None
-        for batch in tqdm(eval_dataloader):
+        #for batch in tqdm(eval_dataloader):
+        for batch in eval_dataloader:
             model.eval()
             batch = tuple(t.to(device) for t in batch)
 
