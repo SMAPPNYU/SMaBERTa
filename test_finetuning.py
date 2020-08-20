@@ -13,3 +13,5 @@ from smaberta import TransformerModel
 model = TransformerModel('roberta', 'roberta-base', finetune=True, args={"num_train_epochs":1, 'fp16':False})
 
 model.finetune("./data/lm_train", "./data/lm_eval")
+
+model.lm_evaluate()
