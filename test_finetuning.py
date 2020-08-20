@@ -10,8 +10,12 @@ torch.cuda.manual_seed(1)
 
 from smaberta import TransformerModel
 
-model = TransformerModel('roberta', 'roberta-base', finetune=True, args={"num_train_epochs":1, 'fp16':False})
+model = TransformerModel('roberta', 'roberta-base', finetune=True, args={"num_train_epochs":1, 'fp16':False, "output_dir":"test-finetune", "reprocess_input":True})
+
+#model.lm_evaluate('./data/lm_eval')
+print("------------------------------------------------")
 
 model.finetune("./data/lm_train", "./data/lm_eval")
 
-model.lm_evaluate()
+print("------------------------------------------------")
+model.lm_evaluate('./data/lm_eval')

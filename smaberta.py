@@ -560,6 +560,7 @@ class TransformerModel:
         tokenizer = self.tokenizer
         args = self.args
         print(args)
+        #print("Starting model finetuning")
         train_dataset = LineByLineTextDataset(tokenizer, file_path=train_file_path)
         """ Train the model """
         tb_writer = SummaryWriter()
@@ -616,7 +617,7 @@ class TransformerModel:
         logger.info("  Instantaneous batch size per GPU = %d", args["finetune_batch_size"])
         logger.info("  Gradient Accumulation steps = %d", 1)
         logger.info("  Total optimization steps = %d", t_total)
-
+        #print("Beginning")
         global_step = 0
         epochs_trained = 0
         steps_trained_in_current_epoch = 0
@@ -640,7 +641,7 @@ class TransformerModel:
 
         model_to_resize = model.module if hasattr(model, "module") else model  # Take care of distributed/parallel training
         model_to_resize.resize_token_embeddings(len(tokenizer))
-
+        model.to(self.device)
         model.zero_grad()
         train_iterator = trange(
             epochs_trained, int(args["num_train_epochs"]), desc="Epoch", disable=False)
@@ -727,6 +728,8 @@ class TransformerModel:
         model = self.model
         tokenizer = self.tokenizer
         args = self.args
+        #print(args)
+        #print("Starting evaluation")
         # Loop to handle MNLI double evaluation (matched, mis-matched)
         eval_output_dir = args["output_dir"]
 
@@ -755,6 +758,7 @@ class TransformerModel:
         logger.info("  Batch size = %d", args["finetune_eval_batch_size"])
         eval_loss = 0.0
         nb_eval_steps = 0
+        model.to(self.device)
         model.eval()
 
         for batch in tqdm(eval_dataloader, desc="Evaluating"):
@@ -772,7 +776,7 @@ class TransformerModel:
         perplexity = torch.exp(torch.tensor(eval_loss))
 
         result = {"perplexity": perplexity}
-
+        print("Evaluation perplexity: ", result)
         output_eval_file = os.path.join(eval_output_dir, prefix, "eval_results.txt")
         with open(output_eval_file, "w") as writer:
             logger.info("***** Eval results {} *****".format(prefix))

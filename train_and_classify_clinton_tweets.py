@@ -46,7 +46,8 @@ epochs = 5
 print("Learning Rate ", lr)
 print("Train Epochs ", epochs)
 
-model = TransformerModel('roberta', 'roberta-base', num_labels=3, args={'reprocess_input_data': True, "num_train_epochs":epochs, "learning_rate":lr, 'overwrite_output_dir': True, 'fp16':False})
+#model = TransformerModel('roberta', 'roberta-base', num_labels=3, args={'reprocess_input_data': True, "num_train_epochs":epochs, "learning_rate":lr, 'overwrite_output_dir': True, 'fp16':False})
+model = TransformerModel('roberta', 'roberta-base', num_labels=3, location="test-finetune/checkpoint-575", args={'reprocess_input_data': True, "num_train_epochs":epochs, "learning_rate":lr, 'overwrite_output_dir': True, 'fp16':False})
 
 model.train_model(train_data)
 """
