@@ -2,6 +2,8 @@
 # coding: utf-8
 # Full credit to simpletransformers v0.6
 
+#TODO more appropriate name since we are just wrapping around RoBERTa 
+
 from __future__ import absolute_import, division, print_function
 
 import os
@@ -46,11 +48,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 class LineByLineTextDataset(Dataset):
+    """
+    Dataset format for finetuning. Each line of file contains new fine tuning sentence.
+    """
     def __init__(self, tokenizer: PreTrainedTokenizer, file_path: str, block_size=512):
         assert os.path.isfile(file_path)
-        # Here, we do not cache the features, operating under the assumption
-        # that we will soon use fast multithreaded tokenizers from the
-        # `tokenizers` repo everywhere =)
         logger.info("Creating features from dataset file at %s", file_path)
 
         with open(file_path, encoding="utf-8") as f:
@@ -65,7 +67,7 @@ class LineByLineTextDataset(Dataset):
         return torch.tensor(self.examples[i], dtype=torch.long)
 
 def mask_tokens(inputs: torch.Tensor, tokenizer: PreTrainedTokenizer, args, mlm_probability=0.15) -> Tuple[torch.Tensor, torch.Tensor]:
-    """ Prepare masked tokens inputs/labels for masked language modeling: 80% MASK, 10% random, 10% original. """
+    """ Prepare masked tokens inputs/labels for masked language modeling """
 
     if tokenizer.mask_token is None:
         raise ValueError(
@@ -105,7 +107,9 @@ class TransformerModel:
         Args:
             model_type: The type of model (bert, xlnet, xlm, roberta, distilbert)
             model_name: Default Transformer model name or path to a directory containing Transformer model file (pytorch_nodel.bin).
+            finetune: Set to true or false based on if you want to initialise the model for fine tuning or classification
             num_labels (optional): The number of labels or classes in the dataset.
+            location: To load a saved model from a particular location on your computer and use that as the base as opposed to the standard release from HuggingFace 
             args (optional): Default args will be used if this parameter is not provided. If provided, it should be a dict containing the args that should be changed in the default args.
             use_cuda (optional): Use GPU if available. Setting to False will force model to use CPU only.
         """
@@ -556,6 +560,16 @@ class TransformerModel:
         return preds, model_outputs
         
     def finetune(self, train_file_path, eval_file_path):
+        """
+        Fine tune the probability distribution of the language model on your own text
+        Args:
+            train_file_path: File containing samples of your text in consecutive lines. No labels necessary
+            eval_file_path: File containing samples of your text in consecutive lines, used as the validation set to perform a sanity check on fine tuning
+        Returns:
+            global_step: Number of training steps
+            Average loss per step
+            Also saves the model in the output_dir provided as an argument on init
+        """
         model = self.model
         tokenizer = self.tokenizer
         args = self.args
@@ -662,7 +676,7 @@ class TransformerModel:
                 outputs = model(inputs, masked_lm_labels=labels) if args["mlm"] else model(inputs, labels=labels)
                 loss = outputs[0]  # model outputs are always tuple in transformers (see doc)
 
-                #if args["n_gpu"] > 1:
+                #if args["n_gpu"] >Also saves the model in the output_dir:
                 #    loss = loss.mean()  # mean() to average on multi-gpu parallel training
 
                 if args["fp16"]:
@@ -725,6 +739,16 @@ class TransformerModel:
         return global_step, tr_loss / global_step
 
     def lm_evaluate(self, eval_file_path, prefix="") -> Dict:
+        """
+        Evaluates the language model for perplexity on the set provided
+        Args:
+            eval_file_path: Location of file containing sample text for validation
+            prefix: Prefix for saving results of evaluation 
+            TODO: Better saving/removing this argument
+        Returns:
+            Final evaluation perplexity score
+            Saves results of evaluation to output_dir 
+        """
         model = self.model
         tokenizer = self.tokenizer
         args = self.args

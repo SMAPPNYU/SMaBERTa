@@ -13,5 +13,8 @@ pip install -r requirements.txt
 ```
 
 ## Usage
+For language model finetuning:
+Follow test_finetuning.py
 
-Follow train_and_classify_clinton_tweet.py
+For classification:
+Follow Tutorial.ipynb and train_and_classify_clinton_tweet.py
