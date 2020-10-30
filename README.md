@@ -13,8 +13,12 @@ pip install -r requirements.txt
 ```
 
 ## Usage
+smaberta.py - main file.
+
+For the example on how to use the model for the classification task:
+Follow Tutorial.ipynb
+
 For language model finetuning:
 Follow test_finetuning.py
 
-For classification:
-Follow Tutorial.ipynb and train_and_classify_clinton_tweet.py
+
