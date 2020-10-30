@@ -1,7 +1,0 @@
-.ipynb_checkpoints/*
-runs/*
-data/*
-outputs/*
-__pycache__/*
-cache_dir/*
-*.pkl
