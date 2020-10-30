@@ -15,10 +15,8 @@ pip install -r requirements.txt
 ## Usage
 smaberta.py - main file.
 
-For the example on how to use the model for the classification task:
-Follow Tutorial.ipynb
+For the example on how to use the model for the classification task follow Tutorial.ipynb.
 
-For language model finetuning:
-Follow test_finetuning.py
+For language model finetuning follow test_finetuning.py.
 
 
