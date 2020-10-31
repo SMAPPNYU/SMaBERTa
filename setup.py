@@ -30,7 +30,8 @@ INSTALL_REQUIRES = [
     'pandas',
     'torch',
     'torchvision',
-    'tensorboardX'
+    'tensorboardX',
+    'tqdm'
 ]
 
 setup(

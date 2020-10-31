@@ -1,6 +1,7 @@
 transformers==2.6.0
 simpletransformers==0.22.1
 pandas
+tensorboardX
 torch
 torchvision
-tensorboardX
+tqdm
