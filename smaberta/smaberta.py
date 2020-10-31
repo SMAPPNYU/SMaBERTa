@@ -7,18 +7,18 @@
 from __future__ import absolute_import, division, print_function
 
 import os
-import random
 import json
+import logging
+import math
+from multiprocessing import cpu_count
+import random
+from typing import Dict, List, Tuple
+
 
 import numpy as np
 from sklearn.metrics import mean_squared_error, matthews_corrcoef, confusion_matrix
 from scipy.stats import pearsonr
-import torch
-from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler,
-                              TensorDataset)
-from torch.utils.data.distributed import DistributedSampler
-from torch.nn.utils.rnn import pad_sequence
-from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampler
+from simpletransformers.classification.classification_utils import (convert_examples_to_features, InputExample)
 from transformers import (WEIGHTS_NAME, BertConfig,
                                   BertForSequenceClassification, BertTokenizer,
                                   RobertaConfig,
@@ -34,17 +34,16 @@ from transformers import (WEIGHTS_NAME, BertConfig,
                                   PreTrainedTokenizer,
                                   PreTrainedModel,
                                   AutoModelWithLMHead)
-
 from transformers import AdamW, get_linear_schedule_with_warmup
-
-from simpletransformers.classification.classification_utils import (convert_examples_to_features, InputExample)
-from typing import Dict, List, Tuple
-import math
+import torch
+from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler,
+                              TensorDataset)
+from torch.utils.data.distributed import DistributedSampler
+from torch.nn.utils.rnn import pad_sequence
+from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampler
 from tensorboardX import SummaryWriter
 from tqdm import trange, tqdm
-from multiprocessing import cpu_count
 
-import logging
 logger = logging.getLogger(__name__)
 
 class LineByLineTextDataset(Dataset):
@@ -101,7 +100,7 @@ def mask_tokens(inputs: torch.Tensor, tokenizer: PreTrainedTokenizer, args, mlm_
 
 
 class TransformerModel:
-    def __init__(self, model_type, model_name, finetune=False, num_labels=2, args=None, use_cuda=True, location=""):
+    def __init__(self, model_type, model_name, finetune=False, num_labels=2, use_cuda=True, location="", **kwargs):
         """
         Initializes a Transformer model.
         Args:
@@ -110,8 +109,8 @@ class TransformerModel:
             finetune: Set to true or false based on if you want to initialise the model for fine tuning or classification
             num_labels (optional): The number of labels or classes in the dataset.
             location: To load a saved model from a particular location on your computer and use that as the base as opposed to the standard release from HuggingFace 
-            args (optional): Default args will be used if this parameter is not provided. If provided, it should be a dict containing the args that should be changed in the default args.
             use_cuda (optional): Use GPU if available. Setting to False will force model to use CPU only.
+            **kwargs (optional): Default args will be used if this parameter is not provided. If provided, it should be a dict containing the args that should be changed in the default args.
         """
 
         MODEL_CLASSES = {
@@ -135,7 +134,7 @@ class TransformerModel:
                 self.model=AutoModelWithLMHead.from_pretrained(location)
             else:    
                 self.model = model_class.from_pretrained(location, num_labels=num_labels)
-       
+                
         if use_cuda:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
@@ -175,8 +174,8 @@ class TransformerModel:
             'model_name_or_path': False,
         }
 
-        if args:
-            self.args.update(args)
+
+        self.args.update(kwargs)
 
         if use_cuda:
             self.args['n_gpu'] : torch.cuda.device_count()
@@ -184,32 +183,45 @@ class TransformerModel:
         self.args['model_name'] = model_name
         self.args['model_type'] = model_type
 
-    def train_model(self, train_df, output_dir=None, show_running_loss=False, args=None):
+    def train(self, training_samples, training_labels, output_dir=None, show_running_loss=False, **kwargs):
         """
         Trains the model using 'train_df'
         Args:
-            train_df: Pandas Dataframe (no header) of two columns, first column containing the text, and the second column containing the label. The model will be trained on this Dataframe.
+            training_samples: Iterable list or pandas series of text samples for training
+            training_labels: Iterable list of the output labels corresponding to the text samples in `training_samples`
             output_dir: The directory where model files will be saved. If not given, self.args['output_dir'] will be used.
             show_running_loss (optional): Set to False to prevent running loss from being printed to console. Defaults to True.
-            args (optional): Optional changes to the args dict of the model. Any changes made will persist for the model.
+            **kwargs (optional): Optional changes to the args dict of the model. Any changes made will persist for the model.
         Returns:
             None
         """
-        if args:
-            self.args.update(args)
+        
+        self.args.update(kwargs)
 
         if not output_dir:
             output_dir = self.args['output_dir']
 
         if os.path.exists(output_dir) and os.listdir(output_dir) and not self.args['overwrite_output_dir']:
             raise ValueError("Output directory ({}) already exists and is not empty. Use --overwrite_output_dir to overcome.".format(output_dir))
+            
+        if not isinstance(training_samples, list):
+            try:
+                training_samples = list(training_samples)
+            except:
+                raise Exception('Training samples must be iterable')
+                
+        if not isinstance(training_labels, list):
+            try:
+                training_labels = list(training_labels)
+            except:
+                raise Exception('Training labels must be iterable')
         
         self.model.to(self.device)
 
-        train_examples = [InputExample(i, text, None, label) for i, (text, label) in enumerate(zip(train_df.iloc[:, 0], train_df.iloc[:, 1]))]
+        train_examples = [InputExample(i, text, None, label) for i, (text, label) in enumerate(zip(training_samples, training_labels))]
 
-        train_dataset = self.load_and_cache_examples(train_examples)
-        global_step, tr_loss = self.train(train_dataset, output_dir, show_running_loss=show_running_loss)
+        train_dataset = self._load_and_cache_examples(train_examples)
+        global_step, tr_loss = self._train(train_dataset, output_dir, show_running_loss=show_running_loss)
         
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
@@ -221,11 +233,12 @@ class TransformerModel:
 
         print(f'Training of {self.args["model_type"]} model complete. Saved to {output_dir}.')
 
-    def eval_model(self, eval_df, output_dir=None, verbose=False, **kwargs):
+    def evaluate(self, testing_samples, testing_labels, output_dir=None, verbose=False, **kwargs):
         """
         Evaluates the model on eval_df. Saves results to output_dir.
         Args:
-            eval_df: Pandas Dataframe (no header) of two columns, first column containing the text, and the second column containing the label. The model will be evaluated on this Dataframe.
+            testing_samples: an iterable list of texts for testing 
+            testing_labels: the labels corresponding to the testing samples
             output_dir: The directory where model files will be saved. If not given, self.args['output_dir'] will be used.
             verbose: If verbose, results will be printed to the console on completion of evaluation.
             **kwargs: Additional metrics that should be used. Pass in the metrics as keyword arguments (name of metric: function to use). E.g. f1=sklearn.metrics.f1_score.
@@ -241,7 +254,7 @@ class TransformerModel:
 
         self.model.to(self.device)
 
-        result, model_outputs, wrong_preds = self.evaluate(eval_df, output_dir, **kwargs)
+        result, model_outputs, wrong_preds = self._evaluate(testing_samples, testing_labels, output_dir, kwargs)
         self.results.update(result)
 
         if not verbose:
@@ -249,22 +262,35 @@ class TransformerModel:
 
         return result, model_outputs, wrong_preds
 
-    def evaluate(self, eval_df, output_dir, prefix="", **kwargs):
+    def _evaluate(self, testing_samples, testing_labels, output_dir, prefix="", **kwargs):
         """
         Evaluates the model on eval_df.
-        Utility function to be used by the eval_model() method. Not intended to be used directly.
+        Utility function to be used by the evaluate() method. Not intended to be used directly.
         """
+        self.args.update(kwargs)
 
         tokenizer = self.tokenizer
         device = self.device
         model = self.model
         args = self.args
         eval_output_dir = output_dir
+        
+        if not isinstance(testing_samples, list):
+            try:
+                testing_samples = list(testing_samples)
+            except:
+                raise Exception('Testing samples must be iterable')
+                
+        if not isinstance(testing_labels, list):
+            try:
+                testing_labels = list(testing_labels)
+            except:
+                raise Exception('Testing labels must be iterable')
 
         results = {}
 
-        eval_examples = [InputExample(i, text, None, label) for i, (text, label) in enumerate(zip(eval_df.iloc[:, 0], eval_df.iloc[:, 1]))]
-        eval_dataset = self.load_and_cache_examples(eval_examples, evaluate=True)
+        eval_examples = [InputExample(i, text, None, label) for i, (text, label) in enumerate(zip(testing_samples, testing_labels))]
+        eval_dataset = self._load_and_cache_examples(eval_examples, evaluate=True)
         if not os.path.exists(eval_output_dir):
             os.makedirs(eval_output_dir)
 
@@ -284,8 +310,8 @@ class TransformerModel:
                 inputs = {'input_ids':      batch[0],
                           'attention_mask': batch[1],
                           'labels':         batch[3]}
-                if args['model_type'] != 'distilbert':
-                    inputs['token_type_ids'] = batch[2] if args['model_type'] in ['bert', 'xlnet'] else None  # XLM, DistilBERT and RoBERTa don't use segment_ids
+                if self.args['model_type'] != 'distilbert':
+                    inputs['token_type_ids'] = batch[2] if self.args['model_type'] in ['bert', 'xlnet'] else None  # XLM, DistilBERT and RoBERTa don't use segment_ids
                 outputs = model(**inputs)
                 tmp_eval_loss, logits = outputs[:2]
 
@@ -313,7 +339,7 @@ class TransformerModel:
         return results, model_outputs, wrong
 
               
-    def load_and_cache_examples(self, examples, evaluate=False, no_cache=False):
+    def _load_and_cache_examples(self, examples, evaluate=False, no_cache=False):
         """
         Converts a list of InputExample objects to a TensorDataset containing InputFeatures. Caches the InputFeatures.
         Utility function for train() and eval() methods. Not intended to be used directly.
@@ -339,14 +365,14 @@ class TransformerModel:
                                                     # xlnet has a cls token at the end
                                                     cls_token_at_end=bool(args['model_type'] in ['xlnet']),
                                                     cls_token=tokenizer.cls_token,
-                                                    cls_token_segment_id=2 if args['model_type'] in ['xlnet'] else 0,
+                                                    cls_token_segment_id=2 if self.args['model_type'] in ['xlnet'] else 0,
                                                     sep_token=tokenizer.sep_token,
                                                     # roberta uses an extra separator b/w pairs of sentences, cf. github.com/pytorch/fairseq/commit/1684e166e3da03f5b600dbb7855cb98ddfcd0805
                                                     sep_token_extra=bool(args['model_type'] in ['roberta']),
                                                     # pad on the left for xlnet
                                                     pad_on_left=bool(args['model_type'] in ['xlnet']),
                                                     pad_token=tokenizer.convert_tokens_to_ids([tokenizer.pad_token])[0],
-                                                    pad_token_segment_id=4 if args['model_type'] in ['xlnet'] else 0,
+                                                    pad_token_segment_id=4 if self.args['model_type'] in ['xlnet'] else 0,
                                                     process_count=process_count, silent=True)
 
             if not no_cache:
@@ -364,7 +390,7 @@ class TransformerModel:
         return dataset
 
 
-    def train(self, train_dataset, output_dir, show_running_loss=True):
+    def _train(self, train_dataset, output_dir, show_running_loss=True):
         """
         Trains the model on train_dataset.
         Utility function to be used by the train_model() method. Not intended to be used directly.
@@ -388,12 +414,12 @@ class TransformerModel:
         ]
 
         warmup_steps = math.ceil(t_total * args['warmup_ratio'])
-        args['warmup_steps'] = warmup_steps if args['warmup_steps'] == 0 else args['warmup_steps']
+        args['warmup_steps'] = warmup_steps if self.args['warmup_steps'] == 0 else args['warmup_steps']
 
         optimizer = AdamW(optimizer_grouped_parameters, lr=args['learning_rate'], eps=args['adam_epsilon'])
         scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args['warmup_steps'], num_training_steps=t_total)
 
-        if args['fp16']:
+        if self.args['fp16']:
             try:
                 from apex import amp
             except ImportError:
@@ -417,18 +443,18 @@ class TransformerModel:
                         'attention_mask': batch[1],
                         'labels':         batch[3]}
                 # XLM, DistilBERT and RoBERTa don't use segment_ids
-                if args['model_type'] != 'distilbert':
-                    inputs['token_type_ids'] = batch[2] if args['model_type'] in ['bert', 'xlnet'] else None  
+                if self.args['model_type'] != 'distilbert':
+                    inputs['token_type_ids'] = batch[2] if self.args['model_type'] in ['bert', 'xlnet'] else None  
                 outputs = model(**inputs)
                 # model outputs are always tuple in pytorch-transformers (see doc)
                 loss = outputs[0]
                 if show_running_loss:
                     print("\rRunning loss: %f" % loss, end='')
 
-                if args['gradient_accumulation_steps'] > 1:
+                if self.args['gradient_accumulation_steps'] > 1:
                     loss = loss / args['gradient_accumulation_steps']
 
-                if args['fp16']:
+                if self.args['fp16']:
                     with amp.scale_loss(loss, optimizer) as scaled_loss:
                         scaled_loss.backward()
                     torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), args['max_grad_norm'])
@@ -444,14 +470,14 @@ class TransformerModel:
                     model.zero_grad()
                     global_step += 1
 
-                    if args['logging_steps'] > 0 and global_step % args['logging_steps'] == 0:
+                    if self.args['logging_steps'] > 0 and global_step % args['logging_steps'] == 0:
                         # Log metrics
                         # Only evaluate when single GPU otherwise metrics may not average well
                         tb_writer.add_scalar('lr', scheduler.get_lr()[0], global_step)
                         tb_writer.add_scalar('loss', (tr_loss - logging_loss)/args['logging_steps'], global_step)
                         logging_loss = tr_loss
 
-                    if args['save_steps'] > 0 and global_step % args['save_steps'] == 0:
+                    if self.args['save_steps'] > 0 and global_step % args['save_steps'] == 0:
                         # Save model checkpoint
                         output_dir = os.path.join(
                             output_dir, 'checkpoint-{}'.format(global_step))
@@ -520,7 +546,7 @@ class TransformerModel:
 
         eval_examples = [InputExample(i, text, None, 0) for i, text in enumerate(to_predict)]
 
-        eval_dataset = self.load_and_cache_examples(eval_examples, evaluate=True, no_cache=True)
+        eval_dataset = self._load_and_cache_examples(eval_examples, evaluate=True, no_cache=True)
 
         eval_sampler = SequentialSampler(eval_dataset)
         eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args['eval_batch_size'])
@@ -538,7 +564,7 @@ class TransformerModel:
                 inputs = {'input_ids':      batch[0],
                         'attention_mask': batch[1],
                         # XLM don't use segment_ids
-                        'token_type_ids': batch[2] if args['model_type'] in ['bert', 'xlnet'] else None,
+                        'token_type_ids': batch[2] if self.args['model_type'] in ['bert', 'xlnet'] else None,
                         'labels':         batch[3]}
                 outputs = model(**inputs)
                 tmp_eval_loss, logits = outputs[:2]
@@ -613,7 +639,7 @@ class TransformerModel:
             optimizer.load_state_dict(torch.load(os.path.join(args["model_name_or_path"], "optimizer.pt")))
             scheduler.load_state_dict(torch.load(os.path.join(args["model_name_or_path"], "scheduler.pt")))
 
-        if args["fp16"]:
+        if self.args["fp16"]:
             try:
                 from apex import amp
             except ImportError:
@@ -636,7 +662,7 @@ class TransformerModel:
         epochs_trained = 0
         steps_trained_in_current_epoch = 0
         # Check if continuing training from a checkpoint
-        if args["model_name_or_path"] and os.path.exists(args["model_name_or_path"]):
+        if self.args["model_name_or_path"] and os.path.exists(self.args["model_name_or_path"]):
             try:
                 # set global_step to gobal_step of last saved checkpoint from model path
                 checkpoint_suffix = args["model_name_or_path"].split("-")[-1].split("/")[0]
@@ -669,17 +695,17 @@ class TransformerModel:
                     steps_trained_in_current_epoch -= 1
                     continue
 
-                inputs, labels = mask_tokens(batch, tokenizer, args) if args["mlm"] else (batch, batch)
+                inputs, labels = mask_tokens(batch, tokenizer, args) if self.args["mlm"] else (batch, batch)
                 inputs = inputs.to(args["device"])
                 labels = labels.to(args["device"])
                 model.train()
-                outputs = model(inputs, masked_lm_labels=labels) if args["mlm"] else model(inputs, labels=labels)
+                outputs = model(inputs, masked_lm_labels=labels) if self.args["mlm"] else model(inputs, labels=labels)
                 loss = outputs[0]  # model outputs are always tuple in transformers (see doc)
 
                 #if args["n_gpu"] >Also saves the model in the output_dir:
                 #    loss = loss.mean()  # mean() to average on multi-gpu parallel training
 
-                if args["fp16"]:
+                if self.args["fp16"]:
                     with amp.scale_loss(loss, optimizer) as scaled_loss:
                         scaled_loss.backward()
                 else:
@@ -687,7 +713,7 @@ class TransformerModel:
 
                 tr_loss += loss.item()
 
-                if args["fp16"]:
+                if self.args["fp16"]:
                     torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), args["max_grad_norm"])
                 else:
                     torch.nn.utils.clip_grad_norm_(model.parameters(), args["max_grad_norm"])
@@ -786,12 +812,12 @@ class TransformerModel:
         model.eval()
 
         for batch in tqdm(eval_dataloader, desc="Evaluating"):
-            inputs, labels = mask_tokens(batch, tokenizer, args) if args["mlm"] else (batch, batch)
+            inputs, labels = mask_tokens(batch, tokenizer, args) if self.args["mlm"] else (batch, batch)
             inputs = inputs.to(args["device"])
             labels = labels.to(args["device"])
 
             with torch.no_grad():
-                outputs = model(inputs, masked_lm_labels=labels) if args["mlm"] else model(inputs, labels=labels)
+                outputs = model(inputs, masked_lm_labels=labels) if self.args["mlm"] else model(inputs, labels=labels)
                 lm_loss = outputs[0]
                 eval_loss += lm_loss.mean().item()
             nb_eval_steps += 1

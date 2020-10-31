@@ -25,22 +25,25 @@ python setup.py install
 
 ## Using the package
 
+Basic use:
+
 ```
 from smaberta import TransformerModel
 
-model = TransformerModel('roberta', 'roberta-base', num_labels=25, 'reprocess_input_data': True, "num_train_epochs":epochs, "learning_rate":lr,                                      'output_dir':'./saved_model/', 'overwrite_output_dir': True, 'fp16':False)
+epochs = 3
+lr = 4e-6
 
-model.train_model(training_data)
+training_sample = ['Today is a great day', 'Today is a terrible day']
+training_labels = [1, 0]
+
+model = TransformerModel('roberta', 'roberta-base', num_labels=25, 'reprocess_input_data': True, "num_train_epochs":epochs, "learning_rate":lr,    
+                         'output_dir':'./saved_model/', 'overwrite_output_dir': True, 'fp16':False)
+
+model.train_model(training_sample, training_labels)
 
 ```
 
-## Repository Contents
-
-smaberta.py - main file.
-
-For the example on how to use the model for the classification task follow `Tutorial.ipynb`.
-
-For language model finetuning follow `test_finetuning.py`.
+For further details, see `Tutorial.ipynb` in the (examples)[https://github.com/SMAPPNYU/SMaBERTa/tree/master/examples] directory.
 
 # Acknowledgements 
 
