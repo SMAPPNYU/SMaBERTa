@@ -46,6 +46,6 @@ For language model finetuning follow `test_finetuning.py`.
 
 Code for this project was adapted from version 0.6 of https://github.com/ThilinaRajapakse/simpletransformers
 
-Zhanna Terechshenko and Vishakh Padmakumar contributed to the software writing, implementation, and testing.
+Vishakh Padmakumar and Zhanna Terechshenko contributed to the software writing, implementation, and testing.
 
 Megan Brown contributed to documentation and publication.
