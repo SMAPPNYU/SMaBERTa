@@ -36,7 +36,7 @@ INSTALL_REQUIRES = [
 
 setup(
     name="smaberta",
-    version='0.0.1',
+    version='0.0.2',
     author="Vishakh Padmakumar, Zhanna Terechshenko",
     description="a wrapper for the huggingface transformer libraries",
     long_description=get_long_description(),
