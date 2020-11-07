@@ -36,10 +36,11 @@ lr = 4e-6
 training_sample = ['Today is a great day', 'Today is a terrible day']
 training_labels = [1, 0]
 
-model = TransformerModel('roberta', 'roberta-base', num_labels=25, reprocess_input_data=True, num_train_epochs=epochs, learning_rate=lr,    
-                         output_dir='./saved_model/', overwrite_output_dir=True, fp16=False)
+model = TransformerModel('roberta', 'roberta-base', num_labels=25, reprocess_input_data=True, 
+                         num_train_epochs=epochs, learning_rate=lr, output_dir='./saved_model/', 
+                         overwrite_output_dir=True, fp16=False)
 
-model.train_model(training_sample, training_labels)
+model.train(training_sample, training_labels)
 
 ```
 
