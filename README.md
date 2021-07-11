@@ -1,7 +1,7 @@
 # SMaBERTa
 
 <a href="https://badge.fury.io/py/SMaBERTa"><img src="https://badge.fury.io/py/smaberta.svg" alt="PyPI version" height="18"></a>
-<a href="https://doi.org/10.5281/zenodo.5090728"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.5090728" alt="DOI"></a>
+<a href="https://doi.org/10.5281/zenodo.5090728"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.5090728.svg" alt="DOI"></a>
 
 This repository contains the code for SMaBERTa, a wrapper for the huggingface transformer libraries.
 It was developed by Zhanna Terechshenko and Vishakh Padmakumar through research at the Center for 
